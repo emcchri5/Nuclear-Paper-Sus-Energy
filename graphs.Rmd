@@ -1,0 +1,93 @@
+---
+title: "Nuclear Project"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+cons_2017 <- read_csv('https://raw.githubusercontent.com/emcchri5/codebank/main/NO_Energy_Cons_2017.csv')
+cons_2018 <- read_csv('https://raw.githubusercontent.com/emcchri5/codebank/main/NO_Energy_Cons_2018.csv')
+cons = read_csv2("http://jmaurit.github.io/analytics/labs/data/consumption-no-areas_2019_hourly.csv")
+```
+
+```{r}
+cons_2017 <- cons_2017 %>%
+  separate('Time(Local)', sep = ' ', into=c('date','time','timezone')) %>%
+  separate(time, sep = ':', into=c('hour', 'minute', 'second'))
+cons_2018 <- cons_2018 %>%
+   separate('Time(Local)', sep = ' ', into=c('date','time','timezone')) %>%
+  separate(time, sep = ':', into=c('hour', 'minute', 'second'))
+cons <- cons %>% separate(Hours, sep = '-', into=c('start','end'))
+```
+
+
+```{r}
+cons_2017 <- cons_2017 %>%
+  mutate(hour = as.numeric(hour))
+cons_2018 <- cons_2018 %>%
+  mutate(hour = as.numeric(hour))
+```
+
+```{r}
+cons_20178 <- rbind(cons_2017, cons_2018)
+cons_20178 <- cons_20178 %>%
+  select(date, hour, Consumption)
+cons_2019 <- cons %>% 
+  select(Date, start, NO)
+```
+
+```{r}
+cons_20178 <- cons_20178 %>%
+  rename('cons' = 'Consumption')
+cons_20178$date <- gsub('\\.', '/', cons_20178$date)
+cons_2019$time <- gsub('\\s+', '', cons$start)
+cons_2019$hour <- as.numeric(cons_2019$time)
+cons_2019 <- cons_2019 %>%
+  select(Date, hour, NO) %>%
+  rename('date' = 'Date', 'cons' = 'NO') %>%
+  mutate(hour = as.numeric(hour))
+```
+
+```{r}
+cons_total <- rbind(cons_20178, cons_2019)
+
+cons_total_means <- cons_total %>%
+  separate(date, sep = '/', into=c('day','month','year')) %>%
+  group_by(hour, month) %>%
+  summarise(
+    mean_cons = mean(cons, na.rm=TRUE)
+  )
+
+cons_total_single <- cons_total %>%
+  filter(date %in% c('21/12/2019','22/12/2019','23/12/2019','24/12/2019','25/12/2019','26/12/2019','27/12/2019'))
+ggplot(data = cons_total_single, mapping = aes(x = hour, y = cons, color = date)) +
+  geom_line(aes(x = hour, y = cons), alpha = 1) +
+  labs(x = 'hour of day', y = ' electricity consumption(MWh)', title = 'Electricity Consumption by Hour', subtitle = 'Christmas Week, 2019 Norway', caption = 'Data from ELSPOT') +
+  scale_y_continuous(limits = c(0,25000))
+
+ggplot(data = cons_total, mapping = aes(x = hour, y = cons, color = date)) +
+  geom_line(aes(x = hour, y = cons), alpha = 1) +
+  labs(x = 'hour of day', y = ' electricity consumption (MWh)', title = 'Electricity Consumption by Hour', subtitle = 'Three years of hourly data, Norway', caption = 'Data from ELSPOT') +
+  scale_y_continuous(limits = c(0,25000))
+
+
+$cons_day_sums <- cons_total %>%
+  mutate(Date = dmy(date)) %>%
+  separate(date, sep = '/', into=c('day','month','year')) %>%
+  group_by(day, Date) %>%
+  summarise(
+    mean_cons = sum(cons, na.rm=TRUE)
+  )
+min(cons_day_means$mean_cons)
+cons_day_means
+p <- ggplot(data = cons_day_sums, mapping = aes(x = Date, y = mean_cons)) +
+  geom_line(alpha = .6) +
+  scale_x_date(date_breaks = '3 months') +
+  scale_y_continuous(limits = c(0,600000), breaks = c(0,50000,100000,150000,200000,250000,300000,350000,400000,450000,500000,550000)) + 
+  labs(x = 'Date', y = ' daily electricity consumption (MWh)', title = 'Electricity Consumption by Day', subtitle = 'Three Years of Daily Data, Norway', caption = 'Data from ELSPOT') +
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5))
+p
+```
